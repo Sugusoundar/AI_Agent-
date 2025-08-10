@@ -84,3 +84,8 @@ Generated Itinerary:
 
   <img width="1366" height="768" alt="Screenshot (86)" src="https://github.com/user-attachments/assets/a7df73f2-6e6c-4422-9f1f-d133bb4d8bfa" />
 
+
+  Video Explanation Link:
+  https://drive.google.com/file/d/1bUimAEggk57hkJ0VlCIHwggKp7Z4R9iz/view?usp=drivesdk
+  
+
