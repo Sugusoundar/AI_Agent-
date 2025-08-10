@@ -1,4 +1,5 @@
 🌍 Beautiful Travel Itinerary Planner
+
 📌 Overview
 The Beautiful Travel Itinerary Planner is an AI-powered application that generates personalized day trip itineraries for any city based on user-provided interests.
 It uses Multi-Agent architecture with LangGraph, LangChain, and Gradio to create a smooth, interactive experience for travel planning.
@@ -45,10 +46,6 @@ Entry point → input_city → input_interest → create_itinerary → END
 
 2. PlannerState
 Stores the current state of the planning process:
-
-python
-Copy
-Edit
 class PlannerState(TypedDict):
   messages : Annotated[List[HumanMessage | AIMessage], "Conversation history"]
   city : str
@@ -67,9 +64,6 @@ create_itinerary → Call LLM to generate the itinerary
 Uses Groq LLaMA 3.3-70B model with a custom prompt to produce structured, bulleted itineraries.
 
 📂 Project Structure
-bash
-Copy
-Edit
 ├── app.py                # Main application code
 ├── requirements.txt      # Dependencies
 ├── README.md             # Documentation
