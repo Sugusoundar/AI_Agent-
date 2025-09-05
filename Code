@@ -1,0 +1,180 @@
+Key components
+
+StateGraph - Define the flow of travel planner
+Planner State - Represents the state
+Node functions - Individual steps ( input_city, input_interest, create_itinerary)
+LLM Integration - Generate the final itinerary
+
+!pip install langchain langchain_core langchain_groq langchain_community langchain langgraph
+#Creating an agent
+import os
+from typing import TypedDict, Annotated, List
+from langgraph.graph import StateGraph, END
+from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables.graph import MermaidDrawMethod
+from IPython.display import display, Image
+
+class PlannerState(TypedDict):
+  messages : Annotated[List[HumanMessage | AIMessage], "The messages in the conversation"]
+  city : str
+  interests : List[str]
+  itinerary : str
+
+from langchain_groq import ChatGroq
+llm=ChatGroq(
+    temperature = 0,
+    groq_api_key="",
+    model_name="llama-3.3-70b-versatile"
+)
+
+itinerary_prompt=ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful travel assistant. Create a day trip itinerary for {city} based on the user's interests: {interests}. Provide a brief, bulleted itinerary."),
+    ("human", "Create an itinerary for my day trip"),
+])
+# Define the agent
+def input_city(state:PlannerState) -> PlannerState:
+  print("Please enter the city you want to visit for your day trip:")
+  user_message = input("Your Input: ")
+  return {
+      **state,
+      "city":user_message,
+      "messages":state['messages']+[HumanMessage(content=user_message)]
+  }
+def input_interest(state:PlannerState) -> PlannerState:
+  print(f"Please enter your interest for the trip to: {state['city']} (comma-separated): ")
+  user_message = input("Your Input: ") 
+  return {
+      **state,
+      "interests":[interest.strip() for interest in user_message.split(",")],
+      "messages":state['messages']+[HumanMessage(content=user_message)]
+  }
+def create_itinerary(state:PlannerState) -> PlannerState:
+  print(f"Creating an itinerary for {state['city']} based on interests: {', '.join(state['interests'])}"),
+  response=llm.invoke(itinerary_prompt.format_messages(city=state['city'],interests=','.join(state['interests'])))
+  print("\nFinal Itinerary:")
+  print(response.content)   
+  return {
+      **state,
+      "messages":state['messages']+[AIMessage(content=response.content)],
+      "itinerary" :response.content,
+  }
+
+#Create and compile the graph
+workflow=StateGraph(PlannerState)
+
+workflow.add_node("input_city",input_city)
+workflow.add_node("input_interest",input_interest)
+workflow.add_node("create_itinerary",create_itinerary)
+
+workflow.set_entry_point("input_city")
+
+workflow.add_edge("input_city","input_interest")
+workflow.add_edge("input_interest","create_itinerary")
+workflow.add_edge("create_itinerary",END)
+
+app=workflow.compile()
+
+#Display the graph
+display(
+    Image(
+        app.get_graph().draw_mermaid_png(
+            draw_method=MermaidDrawMethod.API
+        )
+    )
+)
+
+#Define and run the functions
+def travel_planner(user_request:str):
+  print(f"Initial Request: {user_request}\n")
+  state={
+      "messages":[HumanMessage(content=user_request)],
+      "city":"",
+      "interests":[],
+      "itinerary":"",
+  }
+  for output in app.stream(state):
+    pass
+
+user_request="I want to plan a day trip"
+travel_planner(user_request)
+
+!pip install gradio
+
+import gradio as gr
+from typing import TypedDict, Annotated, List
+from langgraph.graph import StateGraph, END
+from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_groq import ChatGroq
+
+class PlannerState(TypedDict):
+  messages : Annotated[List[HumanMessage | AIMessage], "The messages in the conversation"]
+  city : str
+  interests : List[str]
+  itinerary : str
+
+#Define the LLM
+llm=ChatGroq(
+    temperature = 0,
+    groq_api_key="",
+    model_name="llama-3.3-70b-versatile"
+)
+
+#Define the itinerary prompt
+itinerary_prompt=ChatPromptTemplate.from_messages([
+    ("system", "You are a helpful travel assistant. Create a day trip itinerary for {city} based on the user's interests: {interests}. Provide a brief, bulleted itinerary."),
+    ("human", "Create an itinerary for my day trip"),
+])
+
+def input_city(city: str,state:PlannerState) -> PlannerState:
+  return {
+      **state,
+      "city":city,
+      "messages":state['messages']+[HumanMessage(content=city)]
+  }
+def input_interest(interests:str,state:PlannerState) -> PlannerState:
+  return {
+      **state,
+      "interests":[interest.strip() for interest in interests.split(",")],
+      "messages":state['messages']+[HumanMessage(content=interests)]
+  }
+def create_itinerary(state:PlannerState) -> str:
+  response=llm.invoke(itinerary_prompt.format_messages(city=state['city'],interests=','.join(state['interests'])))
+  state["itinerary"]=response.content
+  state["messages"]+=[AIMessage(content=response.content)]
+  return response.content 
+
+#Define the Gradio Application
+def travel_planner(city:str,interests:str):
+  #Inital state
+  state={
+      "messages":[],
+      "city":"",
+      "interests":[],
+      "itinerary":"",
+  }
+
+  #process city and interests inputs
+  state=input_city(city,state)
+  state=input_interest(interests,state)
+
+  #Generate the itinerary
+  itinerary=create_itinerary(state)
+  return itinerary
+
+#Build the Gradio interface
+interface=gr.Interface(
+    fn=travel_planner,
+    theme='Yntec/Haley_CH_Theme_Orange_Green',
+    inputs=[
+        gr.Textbox(label="Enter the city for your day trip"),
+        gr.Textbox(label="Enter your intereste (comma-separated)"),
+    ],
+    outputs=gr.Textbox(label="Generated Itinerary"),
+    title="Beautiful Travel Itinerary Planner",
+    description="Enter a city and your interests to generate a personalized day trip itinerary."
+)
+
+#Launch the Gradio application
+interface.launch()
